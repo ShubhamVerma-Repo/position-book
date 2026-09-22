@@ -9,7 +9,7 @@ import com.jpmc.positionbook.service.EventHandler;
 import com.jpmc.positionbook.util.IdentifierNormalizer;
 import org.springframework.stereotype.Component;
 
-@Component
+@Component("buyEventHandler")
 public class BuyEventHandler implements EventHandler<BuyRequest> {
 
     private final PositionBookRepository repository;

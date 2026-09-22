@@ -7,7 +7,7 @@ import com.jpmc.positionbook.repository.PositionBookRepository;
 import com.jpmc.positionbook.service.EventHandler;
 import org.springframework.stereotype.Component;
 
-@Component
+@Component("cancelEventHandler")
 public class CancelEventHandler implements EventHandler<CancelRequest> {
 
     private final PositionBookRepository repository;
