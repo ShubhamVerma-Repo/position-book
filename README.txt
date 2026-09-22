@@ -1,14 +1,16 @@
 POSITION BOOK
 =============
 
-An in-memory trade position book service (Spring Boot 3.2.5 / Java 17) exposing
+An in-memory trade position book service (Spring Boot 3.2.12 / Java 17) exposing
 BUY/SELL/CANCEL event ingestion and position lookup over a REST API.
 
 ## How to Run
 
 Local (Maven):
     mvn spring-boot:run
-The app starts on port 8080 (see src/main/resources/application.yml).
+The app starts on port 8080 (see src/main/resources/application.yml). Once
+running, interactive API exploration is available via Swagger UI at
+http://localhost:8080/swagger-ui.html.
 
 Testing and correctness verification:
     mvn clean verify
@@ -365,13 +367,44 @@ production code.
   from valid account/securityId values in the first place, so this only matters
   if that constraint were ever relaxed.
 
+## Dependency Security Notes
+
+pom.xml pins Spring Boot 3.2.12 (the latest patch on the 3.2.x line, chosen
+deliberately over jumping to 3.3.x/3.4.x to minimize behavioral risk this late
+in the project) and overrides three of its managed dependency versions via
+properties, each verified individually against Maven Central and re-tested
+with `mvn clean verify` (all 68 tests, 85%/75% coverage gates) plus a Docker
+build/run/health-check after each change:
+
+- tomcat.version -> 10.1.55 (parent manages 10.1.33, which is in the
+  vulnerable range for CVE-2025-31650, CVE-2025-52520, and CVE-2025-55668;
+  10.1.55 is past all three fixed-in versions)
+- spring-framework.version -> 6.1.21 (parent manages 6.1.15; 6.1.21 is the
+  latest version of the 6.1.x line published as open source on Maven
+  Central, resolving CVE-2025-22233 and CVE-2025-41234)
+- logback.version -> 1.5.19 (parent manages 1.4.14; 1.5.19 resolves
+  CVE-2024-12798 and CVE-2025-11226 - the project's logback-spring.xml uses
+  only a ConsoleAppender and a plain pattern, no Janino/EvaluatorFilter or
+  conditional `<if>` processing, so neither CVE was ever exploitable here,
+  but the version is still patched for defense in depth)
+
+Known limitation, deliberately not chased further: CVE-2025-41242 (fixed at
+Spring Framework 6.1.22) and CVE-2025-41249 (fixed at 6.1.23) have no
+open-source fix available on the 6.1.x line - 6.1.22/6.1.23 exist only under
+VMware Tanzu's commercial support subscription and are not published to
+Maven Central. The first version of Spring Framework with an OSS fix is
+6.2.10/6.2.11, which Spring Boot does not pull in until 3.4.0 (verified
+directly: Spring Boot 3.3.13, the latest 3.3.x patch, still manages
+spring-framework.version 6.1.21, the same version this project uses).
+Reaching 3.4.x would mean leaving the 3.2.x line entirely, which was
+explicitly ruled out for this project to avoid late-stage behavioral risk.
+This gap is accepted as-is rather than worked around with an unsupported
+cross-line framework override.
+
 ## Next Steps
 
 - Per-position lock striping in PositionBookRepository (one lock per PositionKey)
   once actual contention on the single repository-wide lock is observed at scale.
-- OpenAPI/Swagger documentation (e.g. springdoc-openapi) generated from the
-  existing controllers/DTOs, so the API contract in this README is also available
-  as an interactive, machine-readable spec.
 - A live SonarCloud scan once a real SONAR_TOKEN secret is available - the CI
   workflow already has the step wired up, gated to skip gracefully without
   failing the build when the token is absent.

@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.5</version>
+        <version>3.2.12</version>
         <relativePath/>
     </parent>
 
@@ -22,6 +22,9 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <sonar.projectKey>CHANGE_ME_PROJECT_KEY</sonar.projectKey>
         <sonar.organization>CHANGE_ME_ORGANIZATION</sonar.organization>
+        <tomcat.version>10.1.55</tomcat.version>
+        <spring-framework.version>6.1.21</spring-framework.version>
+        <logback.version>1.5.19</logback.version>
     </properties>
 
     <dependencies>
@@ -36,6 +39,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>2.5.0</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
