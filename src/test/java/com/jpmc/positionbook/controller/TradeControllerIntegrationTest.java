@@ -110,6 +110,52 @@ class TradeControllerIntegrationTest {
     }
 
     @Test
+    void validSellReturns201AndNegativeNetQuantity() throws Exception {
+        String body = """
+                {"id": 301, "account": "sellacc", "securityId": "sellsec", "quantity": 75}
+                """;
+
+        mockMvc.perform(post("/api/v1/trades/sell")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.netQuantity").value(-75));
+    }
+
+    @Test
+    void duplicateBuyIdReturns409WithErrorResponseShape() throws Exception {
+        String body = """
+                {"id": 401, "account": "dupacc", "securityId": "dupsec", "quantity": 10}
+                """;
+
+        mockMvc.perform(post("/api/v1/trades/buy")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/v1/trades/buy")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.error").value("Conflict"));
+    }
+
+    @Test
+    void cancelOfUnknownIdReturns404WithErrorResponseShape() throws Exception {
+        String body = """
+                {"id": 999999}
+                """;
+
+        mockMvc.perform(post("/api/v1/trades/cancel")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.error").value("Not Found"));
+    }
+
+    @Test
     void getAllPositionsIncludesTradedPositionAfterATrade() throws Exception {
         String body = """
                 {"id": 202, "account": "listacc", "securityId": "listsec", "quantity": 10}

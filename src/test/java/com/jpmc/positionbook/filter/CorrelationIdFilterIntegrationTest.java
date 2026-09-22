@@ -37,4 +37,15 @@ class CorrelationIdFilterIntegrationTest {
         String correlationId = result.getResponse().getHeader(CorrelationIdFilter.CORRELATION_ID_HEADER);
         assertThat(correlationId).isNotBlank();
     }
+
+    @Test
+    void blankCorrelationIdHeaderStillGetsAGeneratedValueBack() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/positions").header(CorrelationIdFilter.CORRELATION_ID_HEADER, "   "))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String correlationId = result.getResponse().getHeader(CorrelationIdFilter.CORRELATION_ID_HEADER);
+        assertThat(correlationId).isNotBlank();
+        assertThat(correlationId).isNotEqualTo("   ");
+    }
 }
