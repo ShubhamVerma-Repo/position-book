@@ -8,6 +8,14 @@ import com.jpmc.positionbook.model.PositionResponse;
 import com.jpmc.positionbook.model.TradeEventRecord;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -101,5 +109,150 @@ class PositionBookRepositoryTest {
         TradeEventRecord second = new TradeEventRecord(2L, EventType.BUY, "ACC1", "SEC1", 1L);
         assertThatThrownBy(() -> repository.recordBuyOrSell(second, 1L))
                 .isInstanceOf(ArithmeticException.class);
+    }
+
+    @Test
+    void concurrentRecordBuyOrSellWithSameIdAllowsExactlyOneWinnerUnderRealThreadContention() throws InterruptedException {
+        int threadCount = 20;
+        int iterations = 10;
+
+        for (int iteration = 0; iteration < iterations; iteration++) {
+            PositionBookRepository freshRepository = new PositionBookRepository();
+            long eventId = iteration;
+            CountDownLatch startLatch = new CountDownLatch(1);
+            CountDownLatch doneLatch = new CountDownLatch(threadCount);
+            List<Class<? extends Throwable>> outcomes = new CopyOnWriteArrayList<>();
+            AtomicInteger successCount = new AtomicInteger(0);
+            ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+
+            try {
+                for (int t = 0; t < threadCount; t++) {
+                    long quantity = 10L + t;
+                    executor.submit(() -> {
+                        try {
+                            startLatch.await();
+                            TradeEventRecord event = new TradeEventRecord(
+                                    eventId, EventType.BUY, "RACEACC", "RACESEC", quantity);
+                            freshRepository.recordBuyOrSell(event, quantity);
+                            successCount.incrementAndGet();
+                            outcomes.add(null);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        } catch (Throwable thrown) {
+                            outcomes.add(thrown.getClass());
+                        } finally {
+                            doneLatch.countDown();
+                        }
+                    });
+                }
+
+                startLatch.countDown();
+                boolean completedInTime = doneLatch.await(10, TimeUnit.SECONDS);
+                assertThat(completedInTime)
+                        .as("iteration %d: all %d threads should finish within the timeout; a false result here "
+                                        + "indicates a likely deadlock in recordBuyOrSell, not a slow environment",
+                                iteration, threadCount)
+                        .isTrue();
+            } finally {
+                executor.shutdown();
+                boolean terminatedInTime = executor.awaitTermination(10, TimeUnit.SECONDS);
+                assertThat(terminatedInTime)
+                        .as("iteration %d: executor should terminate within the timeout; a false result here "
+                                        + "indicates a likely deadlock in recordBuyOrSell",
+                                iteration)
+                        .isTrue();
+            }
+
+            assertThat(successCount.get())
+                    .as("iteration %d: exactly one thread should win the duplicate-id race", iteration)
+                    .isEqualTo(1);
+
+            long duplicateExceptionCount = outcomes.stream()
+                    .filter(outcome -> outcome != null)
+                    .filter(DuplicateEventException.class::equals)
+                    .count();
+            long unexpectedExceptionCount = outcomes.stream()
+                    .filter(outcome -> outcome != null)
+                    .filter(outcome -> !DuplicateEventException.class.equals(outcome))
+                    .count();
+
+            assertThat(unexpectedExceptionCount)
+                    .as("iteration %d: no thread should throw anything other than DuplicateEventException", iteration)
+                    .isEqualTo(0);
+            assertThat(duplicateExceptionCount)
+                    .as("iteration %d: exactly threadCount-1 threads should lose the race with DuplicateEventException", iteration)
+                    .isEqualTo(threadCount - 1);
+
+            PositionResponse position = freshRepository.findPosition("RACEACC", "RACESEC");
+            TradeEventRecord winningEvent = freshRepository.findEvent(eventId);
+            assertThat(position.getNetQuantity())
+                    .as("iteration %d: net quantity should reflect exactly one successful application", iteration)
+                    .isEqualTo(winningEvent.getQuantity());
+        }
+    }
+
+    @Test
+    void concurrentRecordBuyOrSellWithDistinctIdsAppliesAllWritesExactlyOnceUnderRealThreadContention() throws InterruptedException {
+        int threadCount = 50;
+        int iterations = 10;
+
+        for (int iteration = 0; iteration < iterations; iteration++) {
+            PositionBookRepository freshRepository = new PositionBookRepository();
+            CountDownLatch startLatch = new CountDownLatch(1);
+            CountDownLatch doneLatch = new CountDownLatch(threadCount);
+            List<Class<? extends Throwable>> unexpectedOutcomes = new CopyOnWriteArrayList<>();
+            long expectedTotal = 0;
+            ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+
+            try {
+                for (int t = 0; t < threadCount; t++) {
+                    long eventId = (long) (iteration * threadCount) + t;
+                    long quantity = 1L + t;
+                    expectedTotal += quantity;
+                    executor.submit(() -> {
+                        try {
+                            startLatch.await();
+                            TradeEventRecord event = new TradeEventRecord(
+                                    eventId, EventType.BUY, "DISTINCTACC", "DISTINCTSEC", quantity);
+                            freshRepository.recordBuyOrSell(event, quantity);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        } catch (Throwable thrown) {
+                            unexpectedOutcomes.add(thrown.getClass());
+                        } finally {
+                            doneLatch.countDown();
+                        }
+                    });
+                }
+
+                startLatch.countDown();
+                boolean completedInTime = doneLatch.await(10, TimeUnit.SECONDS);
+                assertThat(completedInTime)
+                        .as("iteration %d: all %d threads should finish within the timeout; a false result here "
+                                        + "indicates a likely deadlock in recordBuyOrSell, not a slow environment",
+                                iteration, threadCount)
+                        .isTrue();
+            } finally {
+                executor.shutdown();
+                boolean terminatedInTime = executor.awaitTermination(10, TimeUnit.SECONDS);
+                assertThat(terminatedInTime)
+                        .as("iteration %d: executor should terminate within the timeout; a false result here "
+                                        + "indicates a likely deadlock in recordBuyOrSell",
+                                iteration)
+                        .isTrue();
+            }
+
+            assertThat(unexpectedOutcomes)
+                    .as("iteration %d: no thread using a distinct event id should ever throw", iteration)
+                    .isEmpty();
+
+            PositionResponse position = freshRepository.findPosition("DISTINCTACC", "DISTINCTSEC");
+            assertThat(position.getNetQuantity())
+                    .as("iteration %d: net quantity should equal the exact sum of all %d distinct writes", iteration, threadCount)
+                    .isEqualTo(expectedTotal);
+            assertThat(position.getEvents())
+                    .as("iteration %d: every one of the %d distinct events should be recorded", iteration, threadCount)
+                    .hasSize(threadCount);
+        }
     }
 }

@@ -1,0 +1,8 @@
+target/
+.git/
+.idea/
+*.iml
+.github/
+README.txt
+.env
+application-local.yml
