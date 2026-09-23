@@ -382,6 +382,38 @@ production code.
   time than the rest of the list. This is a deliberate trade-off matching how
   most high-throughput read APIs behave (per-item consistency rather than
   whole-collection locking), not an oversight.
+- Rate limiting / request throttling: not implemented. Every endpoint
+  currently accepts requests at unlimited rate/volume from any caller. In a
+  real production deployment this would typically be handled at the API
+  gateway or load balancer layer rather than reimplemented per-service.
+- TLS: this service runs on plain HTTP. It assumes TLS termination happens
+  upstream (a load balancer or ingress), which is the standard pattern for
+  services deployed behind a gateway - it does not itself implement HTTPS.
+- CORS: not configured. This matters specifically because the exercise's
+  context (a real-time liquidity/cash platform serving executive dashboards)
+  implies browser-based consumers - a browser-based frontend calling this API
+  directly would currently be blocked by same-origin policy with no CORS
+  headers present. Not addressed here since no specific frontend/origin was
+  given to configure against.
+- Current position vs. point-in-time historical position: the spec asks the
+  system to "maintain the total quantity... held at any point in time" - this
+  is satisfied for the CURRENT state (every GET reflects the latest position
+  accurately), but there is no way to query what a position was as of a
+  specific past timestamp. Since every TradeEventRecord carries a
+  server-assigned processedAt, a point-in-time query (replay all events up to
+  a given cutoff) would be a natural extension, but it is not implemented.
+- Data retention and purge: given the in-memory-only storage required by the
+  spec, all data is inherently purged on process restart - there is no
+  separate retention policy or manual purge mechanism, since none is needed
+  at this scope. A production system with persistent storage would need an
+  explicit retention/purge policy that this in-memory design does not
+  require.
+- Swagger UI and Actuator exposure: both /swagger-ui.html and
+  /actuator/health are currently open with no restriction, consistent with
+  the rest of the API having no authentication (see the AuthN/authZ item
+  above). A production deployment would typically disable springdoc-openapi
+  entirely (or gate it behind a non-production profile) and restrict
+  actuator exposure to internal-only network access.
 
 ## Dependency Security Notes
 
