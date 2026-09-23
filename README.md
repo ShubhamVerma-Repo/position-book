@@ -8,7 +8,10 @@ In-memory trade position book service (Spring Boot 3.2.12 / Java 17) exposing BU
 ```bash
 mvn spring-boot:run
 ```
-Starts on port 8080. Swagger UI: http://localhost:8080/swagger-ui.html. A Postman collection covering all endpoints, every validation rule, and error case is also available at `postman/PositionBook.postman_collection.json` - import it as an alternative to Swagger for manual testing.
+Starts on port 8080.
+
+- **Swagger UI:** http://localhost:8080/swagger-ui.html
+- **Postman collection:** `postman/PositionBook.postman_collection.json` - covers all endpoints, every validation rule, and every error case; import as an alternative to Swagger for manual testing.
 
 **Test and verify:**
 ```bash
