@@ -1,0 +1,914 @@
+{
+  "info": {
+    "name": "Position Book API",
+    "description": "JPMC technical exercise - Position Book. Covers all 4 spec examples, position lookups, and every validation/error rule enforced by the API. Run folders 1-4 in order first (they build shared state on ACC1/SEC1) before folders 5-9, which use their own isolated accounts and do not depend on prior requests. Restart the app between full runs to avoid duplicate-id conflicts on ids reused across passes. Note: the two concurrency tests proving thread-safety (20 threads racing on one event id, 50 threads with distinct ids) cannot be represented in Postman, since they require real multi-threaded execution - these are covered as actual Java tests in PositionBookRepositoryTest instead.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Spec Example 1 - Buying Securities",
+      "item": [
+        {
+          "name": "Buy 1: ACC1/SEC1 qty 100",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1,\n  \"account\": \"ACC1\",\n  \"securityId\": \"SEC1\",\n  \"quantity\": 100\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Buy 2: ACC1/SEC1 qty 50 (expect net 150)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 2,\n  \"account\": \"ACC1\",\n  \"securityId\": \"SEC1\",\n  \"quantity\": 50\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Spec Example 2 - Buying Different Securities",
+      "item": [
+        {
+          "name": "Buy 3: ACC1/SEC1 qty 12",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 3,\n  \"account\": \"ACC1\",\n  \"securityId\": \"SEC1\",\n  \"quantity\": 12\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Buy 4: ACC1/SECXYZ qty 50",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 4,\n  \"account\": \"ACC1\",\n  \"securityId\": \"SECXYZ\",\n  \"quantity\": 50\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Buy 5: ACC2/SECXYZ qty 33",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 5,\n  \"account\": \"ACC2\",\n  \"securityId\": \"SECXYZ\",\n  \"quantity\": 33\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Buy 6: ACC1/SEC1 qty 20 (expect net 32)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 6,\n  \"account\": \"ACC1\",\n  \"securityId\": \"SEC1\",\n  \"quantity\": 20\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Spec Example 3 - Buying and Selling",
+      "item": [
+        {
+          "name": "Buy 10: ACC1/SEC1 qty 100",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 10,\n  \"account\": \"ACC1\",\n  \"securityId\": \"SEC1\",\n  \"quantity\": 100\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Sell 11: ACC1/SEC1 qty 50 (expect net 50)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 11,\n  \"account\": \"ACC1\",\n  \"securityId\": \"SEC1\",\n  \"quantity\": 50\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/sell"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Spec Example 4 - Cancelling Events",
+      "item": [
+        {
+          "name": "Buy 21: ACC1/SEC1 qty 100",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 21,\n  \"account\": \"ACC1\",\n  \"securityId\": \"SEC1\",\n  \"quantity\": 100\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Cancel 21",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 21\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/cancel"
+          }
+        },
+        {
+          "name": "Buy 22: ACC1/SEC1 qty 5 (expect net 5, 3 events)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 22,\n  \"account\": \"ACC1\",\n  \"securityId\": \"SEC1\",\n  \"quantity\": 5\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Cancel-of-cancel: cancel id 21 again (expect 400, already cancelled)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 21\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/cancel"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Position Lookups",
+      "item": [
+        {
+          "name": "Get single position ACC1/SEC1",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/positions/ACC1/SEC1"
+          }
+        },
+        {
+          "name": "Get all positions",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/positions"
+          }
+        },
+        {
+          "name": "Get never-traded position (expect 200, net 0, empty events)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/positions/NEWACC/NEWSEC"
+          }
+        },
+        {
+          "name": "Round-trip to zero: Buy then Cancel, still listed in GET /positions (net 0)",
+          "item": [
+            {
+              "name": "Buy 601: ZEROACC/ZEROSEC qty 50",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"id\": 601,\n  \"account\": \"ZEROACC\",\n  \"securityId\": \"ZEROSEC\",\n  \"quantity\": 50\n}"
+                },
+                "url": "{{baseUrl}}/api/v1/trades/buy"
+              }
+            },
+            {
+              "name": "Cancel 601 (expect net 0)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"id\": 601\n}"
+                },
+                "url": "{{baseUrl}}/api/v1/trades/cancel"
+              }
+            },
+            {
+              "name": "GET /positions - confirm ZEROACC/ZEROSEC still listed with net 0",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/v1/positions"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Business Rule Violations",
+      "item": [
+        {
+          "name": "Duplicate event id (expect 409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1,\n  \"account\": \"ACC1\",\n  \"securityId\": \"SEC1\",\n  \"quantity\": 999\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Duplicate id across BUY and SELL (expect 409)",
+          "item": [
+            {
+              "name": "Buy 900: DUPACC/DUPSEC qty 10",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"id\": 900,\n  \"account\": \"DUPACC\",\n  \"securityId\": \"DUPSEC\",\n  \"quantity\": 10\n}"
+                },
+                "url": "{{baseUrl}}/api/v1/trades/buy"
+              }
+            },
+            {
+              "name": "Sell 900 (same id, expect 409)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"id\": 900,\n  \"account\": \"DUPACC\",\n  \"securityId\": \"DUPSEC\",\n  \"quantity\": 5\n}"
+                },
+                "url": "{{baseUrl}}/api/v1/trades/sell"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancel unknown id (expect 404)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 99999\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/cancel"
+          }
+        },
+        {
+          "name": "Sell beyond holdings - short position (expect 201, negative net)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 300,\n  \"account\": \"ACCSHORT\",\n  \"securityId\": \"SECSHORT\",\n  \"quantity\": 500\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/sell"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Field Validation - id and quantity",
+      "item": [
+        {
+          "name": "Missing id field entirely (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account\": \"ACC5\",\n  \"securityId\": \"SEC5\",\n  \"quantity\": 10\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Missing quantity (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 200,\n  \"account\": \"ACC5\",\n  \"securityId\": \"SEC5\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Zero quantity (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 201,\n  \"account\": \"ACC5\",\n  \"securityId\": \"SEC5\",\n  \"quantity\": 0\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Negative quantity (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 202,\n  \"account\": \"ACC5\",\n  \"securityId\": \"SEC5\",\n  \"quantity\": -10\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Quantity exceeds max cap 1,000,000,000 (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 203,\n  \"account\": \"ACC5\",\n  \"securityId\": \"SEC5\",\n  \"quantity\": 2000000000\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Zero id (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 0,\n  \"account\": \"ACC5\",\n  \"securityId\": \"SEC5\",\n  \"quantity\": 10\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Negative id (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": -5,\n  \"account\": \"ACC5\",\n  \"securityId\": \"SEC5\",\n  \"quantity\": 10\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Fractional quantity 10.5 (expect 400, not silently truncated)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 204,\n  \"account\": \"ACC5\",\n  \"securityId\": \"SEC5\",\n  \"quantity\": 10.5\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Whole number in decimal syntax 100.0 (expect 400, still rejected)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 205,\n  \"account\": \"ACC5\",\n  \"securityId\": \"SEC5\",\n  \"quantity\": 100.0\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Fractional id 5.5 (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 5.5,\n  \"account\": \"ACC5\",\n  \"securityId\": \"SEC5\",\n  \"quantity\": 10\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Negative fractional quantity -10.5 (expect 400, clean error, no 500)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 206,\n  \"account\": \"ACC5\",\n  \"securityId\": \"SEC5\",\n  \"quantity\": -10.5\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Field Validation - account and securityId",
+      "item": [
+        {
+          "name": "Missing account (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 210,\n  \"securityId\": \"SEC5\",\n  \"quantity\": 10\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Blank account (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 215,\n  \"account\": \"   \",\n  \"securityId\": \"SEC5\",\n  \"quantity\": 10\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Blank securityId (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 211,\n  \"account\": \"ACC5\",\n  \"securityId\": \"   \",\n  \"quantity\": 10\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Invalid character in account, e.g. ACC!1 (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 212,\n  \"account\": \"ACC!1\",\n  \"securityId\": \"SEC5\",\n  \"quantity\": 10\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Invalid character in securityId, e.g. SEC!1 (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 213,\n  \"account\": \"ACC5\",\n  \"securityId\": \"SEC!1\",\n  \"quantity\": 10\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/sell"
+          }
+        },
+        {
+          "name": "Over-length account, 51 chars (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 214,\n  \"account\": \"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\n  \"securityId\": \"SEC5\",\n  \"quantity\": 10\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Over-length securityId, 51 chars (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 216,\n  \"account\": \"ACC5\",\n  \"securityId\": \"SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS\",\n  \"quantity\": 10\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/sell"
+          }
+        },
+        {
+          "name": "Case-insensitivity: lowercase acc/sec normalized to uppercase on read",
+          "item": [
+            {
+              "name": "Buy 220: acc10/sec10 (lowercase) qty 10",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"id\": 220,\n  \"account\": \"acc10\",\n  \"securityId\": \"sec10\",\n  \"quantity\": 10\n}"
+                },
+                "url": "{{baseUrl}}/api/v1/trades/buy"
+              }
+            },
+            {
+              "name": "GET /positions/ACC10/SEC10 (uppercase, expect 200 with the trade)",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/v1/positions/ACC10/SEC10"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid character in GET path variable, e.g. ACC_1! (expect 400)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/positions/ACC_1!/SEC1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Malformed Requests and Content Type",
+      "item": [
+        {
+          "name": "Unknown JSON field on cancel (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1,\n  \"quantity\": 5\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/cancel"
+          }
+        },
+        {
+          "name": "Unknown JSON field on buy (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 230,\n  \"account\": \"ACC5\",\n  \"securityId\": \"SEC5\",\n  \"quantity\": 10,\n  \"unexpectedField\": \"oops\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Unknown JSON field on sell (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 232,\n  \"account\": \"ACC5\",\n  \"securityId\": \"SEC5\",\n  \"quantity\": 10,\n  \"extra\": true\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/sell"
+          }
+        },
+        {
+          "name": "Malformed JSON syntax (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"id\": 231, \"account\": "
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Wrong content type, text/plain (expect 415)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/plain"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "not json"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Wrong HTTP method, GET on /trades/buy (expect 405)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "JSON fields in different order still accepted (expect 201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 42,\n  \"securityId\": \"REORDERSEC\",\n  \"account\": \"REORDERACC\",\n  \"id\": 240\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/buy"
+          }
+        },
+        {
+          "name": "Wrong HTTP method, POST on /positions (expect 405)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": "{{baseUrl}}/api/v1/positions"
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Observability",
+      "item": [
+        {
+          "name": "Actuator health",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/actuator/health"
+          }
+        },
+        {
+          "name": "Correlation id round-trip: supply X-Correlation-Id, expect same value echoed back",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-Id",
+                "value": "manual-test-12345"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/positions"
+          }
+        }
+      ]
+    }
+  ]
+}
