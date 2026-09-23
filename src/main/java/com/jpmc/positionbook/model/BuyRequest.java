@@ -4,7 +4,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 
 public class BuyRequest {
 
@@ -14,9 +16,13 @@ public class BuyRequest {
     private Long id;
 
     @NotBlank
+    @Pattern(regexp = "^[A-Za-z0-9]+$")
+    @Size(min = 1, max = 50)
     private String account;
 
     @NotBlank
+    @Pattern(regexp = "^[A-Za-z0-9]+$")
+    @Size(min = 1, max = 50)
     private String securityId;
 
     @NotNull

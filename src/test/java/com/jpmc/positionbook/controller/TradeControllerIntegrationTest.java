@@ -254,4 +254,189 @@ class TradeControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.account == 'LISTACC' && @.securityId == 'LISTSEC')]").exists());
     }
+
+    @Test
+    void buyWithInvalidCharacterInAccountReturns400() throws Exception {
+        String body = """
+                {"id": 501, "account": "ACC!1", "securityId": "sec1", "quantity": 100}
+                """;
+
+        mockMvc.perform(post("/api/v1/trades/buy")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.details[0]").value(org.hamcrest.Matchers.containsString("account")));
+    }
+
+    @Test
+    void sellWithInvalidCharacterInSecurityIdReturns400() throws Exception {
+        String body = """
+                {"id": 502, "account": "acc1", "securityId": "SEC!1", "quantity": 100}
+                """;
+
+        mockMvc.perform(post("/api/v1/trades/sell")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.details[0]").value(org.hamcrest.Matchers.containsString("securityId")));
+    }
+
+    @Test
+    void buyWithOverLengthAccountReturns400() throws Exception {
+        String tooLong = "A".repeat(51);
+        String body = """
+                {"id": 503, "account": "%s", "securityId": "sec1", "quantity": 100}
+                """.formatted(tooLong);
+
+        mockMvc.perform(post("/api/v1/trades/buy")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.details[0]").value(org.hamcrest.Matchers.containsString("account")));
+    }
+
+    @Test
+    void sellWithOverLengthSecurityIdReturns400() throws Exception {
+        String tooLong = "S".repeat(51);
+        String body = """
+                {"id": 504, "account": "acc1", "securityId": "%s", "quantity": 100}
+                """.formatted(tooLong);
+
+        mockMvc.perform(post("/api/v1/trades/sell")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.details[0]").value(org.hamcrest.Matchers.containsString("securityId")));
+    }
+
+    @Test
+    void buyWithNonNumericQuantityReturns400WithErrorResponseShapeNotProblemDetail() throws Exception {
+        String body = """
+                {"id": 505, "account": "acc1", "securityId": "sec1", "quantity": "abc"}
+                """;
+
+        mockMvc.perform(post("/api/v1/trades/buy")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").exists())
+                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.details").isArray())
+                .andExpect(jsonPath("$.type").doesNotExist())
+                .andExpect(jsonPath("$.title").doesNotExist())
+                .andExpect(jsonPath("$.instance").doesNotExist());
+    }
+
+    @Test
+    void positionFullyUnwoundToZeroStillAppearsInGetAllPositions() throws Exception {
+        String buyBody = """
+                {"id": 601, "account": "zeroacc", "securityId": "zerosec", "quantity": 50}
+                """;
+        String cancelBody = """
+                {"id": 601}
+                """;
+
+        mockMvc.perform(post("/api/v1/trades/buy")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(buyBody))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/v1/trades/cancel")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(cancelBody))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.netQuantity").value(0));
+
+        mockMvc.perform(get("/api/v1/positions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.account == 'ZEROACC' && @.securityId == 'ZEROSEC' && @.netQuantity == 0)]").exists());
+    }
+
+    @Test
+    void validBuyWithReorderedJsonFieldsIsStillAccepted() throws Exception {
+        String body = """
+                {"quantity": 42, "securityId": "reordersec", "account": "reorderacc", "id": 701}
+                """;
+
+        mockMvc.perform(post("/api/v1/trades/buy")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.netQuantity").value(42));
+    }
+
+    @Test
+    void buyWithFractionalQuantityReturns400WithErrorResponseShapeNotProblemDetail() throws Exception {
+        String body = """
+                {"id": 801, "account": "acc1", "securityId": "sec1", "quantity": 10.5}
+                """;
+
+        mockMvc.perform(post("/api/v1/trades/buy")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").exists())
+                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.details").isArray())
+                .andExpect(jsonPath("$.type").doesNotExist())
+                .andExpect(jsonPath("$.title").doesNotExist())
+                .andExpect(jsonPath("$.instance").doesNotExist());
+    }
+
+    @Test
+    void buyWithFractionalIdReturns400WithErrorResponseShapeNotProblemDetail() throws Exception {
+        String body = """
+                {"id": 5.5, "account": "acc1", "securityId": "sec1", "quantity": 100}
+                """;
+
+        mockMvc.perform(post("/api/v1/trades/buy")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").exists())
+                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.details").isArray())
+                .andExpect(jsonPath("$.type").doesNotExist())
+                .andExpect(jsonPath("$.title").doesNotExist())
+                .andExpect(jsonPath("$.instance").doesNotExist());
+    }
+
+    @Test
+    void buyWithWholeNumberWrittenInDecimalNotationForQuantityReturns400() throws Exception {
+        String body = """
+                {"id": 802, "account": "acc1", "securityId": "sec1", "quantity": 100.0}
+                """;
+
+        mockMvc.perform(post("/api/v1/trades/buy")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    void buyWithNegativeFractionalQuantityReturns400NotAnUnhandledException() throws Exception {
+        String body = """
+                {"id": 803, "account": "acc1", "securityId": "sec1", "quantity": -10.5}
+                """;
+
+        mockMvc.perform(post("/api/v1/trades/buy")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").exists())
+                .andExpect(jsonPath("$.message").exists());
+    }
 }
