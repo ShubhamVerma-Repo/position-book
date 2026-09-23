@@ -228,7 +228,13 @@ accidentally wired to the wrong bean.
   the controller class level for Spring to actually enforce constraints on a
   bare @PathVariable - without it, these annotations are silently ignored rather
   than erroring, which was specifically tested for and caught during
-  development.
+  development. BuyRequest/SellRequest's account and securityId fields now carry
+  the identical @Pattern/@Size constraint (mapped to 400 via
+  MethodArgumentNotValidException instead, since these are request-body fields
+  rather than path variables) - the write path (POST /trades/buy, /trades/sell)
+  and read path (GET /positions/{account}/{securityId}) enforce exactly the
+  same account/securityId rules, closing what was previously a write/read
+  validation asymmetry.
 
 ## Concurrency and Data Integrity
 
@@ -274,6 +280,18 @@ wrapping. The DTO cap means true overflow cannot be reached through the public
 HTTP API today, but the repository-level guard exists as defense in depth and is
 verified directly (bypassing DTO validation) in PositionBookRepositoryTest.
 
+Fractional JSON numbers are rejected, not silently truncated:
+spring.jackson.deserialization.accept-float-as-int is set to false in
+application.yml, so any JSON number written with decimal/float syntax (e.g.
+10.5, or even 100.0, which is numerically whole but not written as a JSON
+integer) is rejected with 400 for every integral field (id on
+BuyRequest/SellRequest/CancelRequest, quantity on BuyRequest/SellRequest)
+rather than silently truncated to its integer part. Without this, a caller
+sending 10.5 for quantity would have it silently accepted as 10 - a
+financial-correctness fix, not just an input-validation nicety, since a
+trade quantity or event id silently losing precision is a data-integrity
+risk in this domain, not merely a cosmetic API strictness concern.
+
 Event history is append-only and immutable: TradeEventRecord has no setters, all
 fields are final, and each position's drilldown list is a CopyOnWriteArrayList
 that is only ever appended to, never rewritten or removed from. Callers only ever
@@ -311,10 +329,10 @@ reported, because the exercise's "full and high quality test coverage"
 requirement is a concrete guarantee only if unmet coverage can actually block a
 release - a report alone is just a claim.
 
-Final JaCoCo numbers (mvn clean verify): 98.1% line coverage (258/263), 100%
-branch coverage - both comfortably above the enforced 85% line / 75% branch
-gate in pom.xml, confirmed stable across three separate mvn clean verify runs.
-target/site/jacoco/index.html has the full file-by-file breakdown.
+Final JaCoCo numbers (mvn clean verify, 85 tests): 98.5% line coverage
+(259/263), 100% branch coverage (52/52) - both comfortably above the enforced
+85% line / 75% branch gate in pom.xml. target/site/jacoco/index.html has the
+full file-by-file breakdown.
 
 Three tests are deliberately not end-to-end HTTP tests, and each is a genuine,
 non-gaming exception documented at the point of use:
@@ -421,8 +439,9 @@ pom.xml pins Spring Boot 3.2.12 (the latest patch on the 3.2.x line, chosen
 deliberately over jumping to 3.3.x/3.4.x to minimize behavioral risk this late
 in the project) and overrides three of its managed dependency versions via
 properties, each verified individually against Maven Central and re-tested
-with `mvn clean verify` (all 68 tests, 85%/75% coverage gates) plus a Docker
-build/run/health-check after each change:
+with `mvn clean verify` (full test suite, 85%/75% coverage gates - see Test
+Coverage for the current test count) plus a Docker build/run/health-check
+after each change:
 
 - tomcat.version -> 10.1.55 (parent manages 10.1.33, which is in the
   vulnerable range for CVE-2025-31650, CVE-2025-52520, and CVE-2025-55668;
