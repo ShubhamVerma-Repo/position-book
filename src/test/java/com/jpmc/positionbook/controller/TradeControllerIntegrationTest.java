@@ -156,6 +156,90 @@ class TradeControllerIntegrationTest {
     }
 
     @Test
+    void buyWithZeroIdReturns400ReferencingId() throws Exception {
+        String body = """
+                {"id": 0, "account": "acc1", "securityId": "sec1", "quantity": 100}
+                """;
+
+        mockMvc.perform(post("/api/v1/trades/buy")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.details[0]").value(org.hamcrest.Matchers.containsString("id")));
+    }
+
+    @Test
+    void buyWithNegativeIdReturns400ReferencingId() throws Exception {
+        String body = """
+                {"id": -5, "account": "acc1", "securityId": "sec1", "quantity": 100}
+                """;
+
+        mockMvc.perform(post("/api/v1/trades/buy")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.details[0]").value(org.hamcrest.Matchers.containsString("id")));
+    }
+
+    @Test
+    void sellWithZeroIdReturns400ReferencingId() throws Exception {
+        String body = """
+                {"id": 0, "account": "acc1", "securityId": "sec1", "quantity": 100}
+                """;
+
+        mockMvc.perform(post("/api/v1/trades/sell")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.details[0]").value(org.hamcrest.Matchers.containsString("id")));
+    }
+
+    @Test
+    void sellWithNegativeIdReturns400ReferencingId() throws Exception {
+        String body = """
+                {"id": -5, "account": "acc1", "securityId": "sec1", "quantity": 100}
+                """;
+
+        mockMvc.perform(post("/api/v1/trades/sell")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.details[0]").value(org.hamcrest.Matchers.containsString("id")));
+    }
+
+    @Test
+    void cancelWithZeroIdReturns400ReferencingId() throws Exception {
+        String body = """
+                {"id": 0}
+                """;
+
+        mockMvc.perform(post("/api/v1/trades/cancel")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.details[0]").value(org.hamcrest.Matchers.containsString("id")));
+    }
+
+    @Test
+    void cancelWithNegativeIdReturns400ReferencingId() throws Exception {
+        String body = """
+                {"id": -5}
+                """;
+
+        mockMvc.perform(post("/api/v1/trades/cancel")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.details[0]").value(org.hamcrest.Matchers.containsString("id")));
+    }
+
+    @Test
     void getAllPositionsIncludesTradedPositionAfterATrade() throws Exception {
         String body = """
                 {"id": 202, "account": "listacc", "securityId": "listsec", "quantity": 10}

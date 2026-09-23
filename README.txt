@@ -366,6 +366,22 @@ production code.
   (alphanumeric only) additionally rules out "/" and other special characters
   from valid account/securityId values in the first place, so this only matters
   if that constraint were ever relaxed.
+- Pagination on GET /api/v1/positions: not implemented, since it's unbounded
+  at the current in-memory/single-instance scale intended for this exercise.
+  If implemented, the natural approach would be Spring's Pageable/Page<T>
+  support with ?page= and ?size= query parameters (defaulting to a sane page
+  size), returning a wrapped {content, page, size, totalElements} shape
+  rather than the current plain array - this would only affect GET
+  /positions, not GET /positions/{account}/{securityId}, which is already a
+  single-item lookup.
+- Read consistency on GET /api/v1/positions: each individual position in the
+  returned list is internally consistent (read under the repository's
+  synchronized access), but the list as a whole is not a single atomic
+  snapshot - a concurrent write to one position while others are being read
+  could result in that one position reflecting a slightly different point in
+  time than the rest of the list. This is a deliberate trade-off matching how
+  most high-throughput read APIs behave (per-item consistency rather than
+  whole-collection locking), not an oversight.
 
 ## Dependency Security Notes
 
