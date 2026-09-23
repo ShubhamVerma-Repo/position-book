@@ -31,8 +31,12 @@ jobs:
           path: target/site/jacoco/
 
       - name: SonarCloud scan
-        if: ${{ secrets.SONAR_TOKEN != '' }}
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: mvn sonar:sonar -Dsonar.token="$SONAR_TOKEN"
+        run: |
+          if [ -n "$SONAR_TOKEN" ]; then
+            mvn sonar:sonar -Dsonar.token="$SONAR_TOKEN"
+          else
+            echo "SONAR_TOKEN not set - skipping SonarCloud scan"
+          fi
